@@ -20,3 +20,7 @@ LLM_MODEL=ollama/qwen2.5-coder:7b
 ## Usage
 ```bash
 uv run agent.py "What is REST?"
+
+
+""
+
