@@ -225,6 +225,7 @@ def main():
         base_url=base_url,
         api_key=api_key,
         default_headers={},
+        timeout=60.0,  # 60 second timeout for LLM calls
     )
 
     messages = [
