@@ -79,17 +79,21 @@ def read_file(path):
     except Exception as e:
         return f"Error: {str(e)}"
 
-def query_api(method, path, body=None):
-    """Call the deployed backend API."""
+def query_api(method, path, body=None, auth=True):
+    """Call the deployed backend API.
+
+    Args:
+        method: HTTP method (GET or POST)
+        path: API endpoint path (e.g., /items/)
+        body: Optional JSON body for POST requests
+        auth: If True, include Authorization header. If False, skip auth (for testing auth errors).
+    """
     base_url = os.getenv("AGENT_API_BASE_URL", "http://localhost:42002").rstrip('/')
-    lms_key = os.getenv("LMS_API_KEY")
-    if not lms_key:
-        return json.dumps({"error": "LMS_API_KEY not set"})
+    lms_key = os.getenv("LMS_API_KEY") if auth else None
     url = base_url + path
-    headers = {
-        "Authorization": f"Bearer {lms_key}",
-        "Content-Type": "application/json"
-    }
+    headers = {"Content-Type": "application/json"}
+    if auth and lms_key:
+        headers["Authorization"] = f"Bearer {lms_key}"
     try:
         with httpx.Client(timeout=10) as client:
             if method.upper() == "GET":
@@ -143,7 +147,8 @@ tools = [
                 "properties": {
                     "method": {"type": "string", "enum": ["GET", "POST"], "description": "HTTP method"},
                     "path": {"type": "string", "description": "API endpoint path, e.g., /items/ or /analytics/completion-rate?lab=lab-01"},
-                    "body": {"type": "string", "description": "Optional JSON request body for POST"}
+                    "body": {"type": "string", "description": "Optional JSON request body for POST"},
+                    "auth": {"type": "boolean", "description": "If true (default), include Authorization header. Set to false to test authentication errors."}
                 },
                 "required": ["method", "path"]
             }
@@ -161,10 +166,11 @@ SYSTEM_PROMPT = """You are an intelligent assistant with access to three types o
 2. **read_file(path)** - Read the contents of a file at a given path relative to project root.
    - path is a relative path like "wiki/git-workflow.md" or "backend/app/main.py", NOT starting with /
 
-3. **query_api(method, path, body?)** - Call the deployed backend API to get live data.
+3. **query_api(method, path, body?, auth?)** - Call the deployed backend API to get live data.
    - method is "GET" or "POST"
    - path is an API endpoint like "/items/" or "/analytics/completion-rate"
    - body is optional JSON string for POST requests
+   - auth is optional (defaults to true). Set to false to test authentication errors (expect 401 Unauthorized)
 
 ## Important: Answer Simple Questions Directly
 
@@ -185,6 +191,7 @@ If the question is a simple factual question that doesn't require project files 
 ### Live System Questions (database counts, status codes, analytics)
 - Call query_api(method="GET", path="/items/") to get item counts
 - Call query_api(method="GET", path="/analytics/...") for analytics endpoints
+- To test authentication: call query_api with auth=false to see the error response
 - source field is optional for API questions
 
 ## Output Format
@@ -272,7 +279,8 @@ def main():
                     result = query_api(
                         method=args.get("method", "GET"),
                         path=args.get("path", ""),
-                        body=args.get("body")
+                        body=args.get("body"),
+                        auth=args.get("auth", True)
                     )
                 else:
                     result = f"Unknown tool: {func_name}"
@@ -316,7 +324,8 @@ def main():
                 result = query_api(
                     method=args.get("method", "GET"),
                     path=args.get("path", ""),
-                    body=args.get("body")
+                    body=args.get("body"),
+                    auth=args.get("auth", True)
                 )
             else:
                 result = f"Unknown tool: {func_name}"
