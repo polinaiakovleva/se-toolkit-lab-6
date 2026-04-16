@@ -250,7 +250,9 @@ def main():
             sys.exit(1)
 
         assistant_message = response.choices[0].message
+        content = assistant_message.content or ""
 
+        # Check for tool calls in the standard OpenAI format
         if assistant_message.tool_calls:
             messages.append(assistant_message)
 
@@ -288,25 +290,71 @@ def main():
                 })
 
             continue
-        else:
-            final_text = assistant_message.content
-            logger.info(f"Final response: {final_text}")
-            try:
-                result_json = json.loads(final_text)
-                answer = result_json.get("answer", "")
-                source = result_json.get("source", "")
-            except json.JSONDecodeError:
-                answer = final_text
-                source = ""
 
-            output = {
-                "answer": answer,
-                "source": source,
-                "tool_calls": tool_calls_history
-            }
-            print(json.dumps(output, ensure_ascii=False, indent=2))
-            logger.info("Done")
-            return
+        # Check for tool calls embedded in text (for models that don't use proper function calling)
+        text_tool_call = None
+        import re
+        # Look for JSON with "name" and "arguments" keys
+        json_match = re.search(r'\{[^{}]*"name"\s*:\s*"([^"]+)"[^{}]*"arguments"\s*:\s*(\{[^}]+\})[^{}]*\}', content, re.DOTALL)
+        if not json_match:
+            # Also try looking for tool call in markdown code block
+            json_match = re.search(r'```json\s*\{[^{}]*"name"\s*:\s*"([^"]+)"[^{}]*"arguments"\s*:\s*(\{[^}]+\})[^{}]*\}\s*```', content, re.DOTALL)
+
+        if json_match:
+            func_name = json_match.group(1)
+            try:
+                args = json.loads(json_match.group(2))
+            except:
+                args = {}
+            logger.info(f"Text tool call: {func_name} with args {args}")
+
+            if func_name == "list_files":
+                result = list_files(args.get("path", ""))
+            elif func_name == "read_file":
+                result = read_file(args.get("path", ""))
+            elif func_name == "query_api":
+                result = query_api(
+                    method=args.get("method", "GET"),
+                    path=args.get("path", ""),
+                    body=args.get("body")
+                )
+            else:
+                result = f"Unknown tool: {func_name}"
+
+            tool_calls_history.append({
+                "tool": func_name,
+                "args": args,
+                "result": result
+            })
+
+            # Feed result back to model
+            messages.append({"role": "assistant", "content": content})
+            messages.append({"role": "user", "content": f"Tool result: {result}\n\nNow answer the original question with a JSON object containing 'answer' and 'source' (if applicable)."})
+            continue
+
+        # No tool calls - this should be the final answer
+        logger.info(f"Final response: {content}")
+        try:
+            # Try to extract JSON from response
+            json_match = re.search(r'\{[^{}]*"answer"[^{}]*\}', content, re.DOTALL)
+            if json_match:
+                result_json = json.loads(json_match.group(0))
+            else:
+                result_json = json.loads(content)
+            answer = result_json.get("answer", "")
+            source = result_json.get("source", "")
+        except json.JSONDecodeError:
+            answer = content
+            source = ""
+
+        output = {
+            "answer": answer,
+            "source": source,
+            "tool_calls": tool_calls_history
+        }
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+        logger.info("Done")
+        return
 
     output = {
         "answer": "Could not find answer within tool call limit.",
