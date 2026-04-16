@@ -165,6 +165,7 @@ SYSTEM_PROMPT = """You are an intelligent assistant with access to three types o
 
 2. **read_file(path)** - Read the contents of a file at a given path relative to project root.
    - path is a relative path like "wiki/git-workflow.md" or "backend/app/main.py", NOT starting with /
+   - IMPORTANT: Only read files that exist in the list_files output
 
 3. **query_api(method, path, body?, auth?)** - Call the deployed backend API to get live data.
    - method is "GET" or "POST"
@@ -180,7 +181,9 @@ If the question is a simple factual question that doesn't require project files 
 
 ### Wiki Questions (documentation, processes, how-to guides)
 - First call: list_files(path="wiki") to discover available wiki files
-- Then call: read_file(path="wiki/some-file.md") to read specific documentation
+- Look at the filenames in the output and pick the most relevant one
+- Then call: read_file(path="wiki/<filename-from-output>") using an ACTUAL filename from the list
+- Common wiki files: github.md (for GitHub questions), git.md (for Git questions), ssh.md (for SSH questions)
 - Include source in output: {"answer": "...", "source": "wiki/some-file.md"}
 
 ### Source Code Questions (framework, implementation details, architecture)
@@ -207,7 +210,8 @@ When you have gathered enough information (or for simple questions that don't ne
 - For simple questions that don't require tools, answer directly in JSON format
 - For project questions, always use tools to find information, never guess
 - Maximum 10 tool calls per question
-- For wiki questions, always include a source reference"""
+- For wiki questions, always include a source reference
+- ALWAYS use filenames from list_files output, never invent filenames"""
 
 # ---------- Main ----------
 def main():
