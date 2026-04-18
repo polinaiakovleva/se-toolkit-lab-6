@@ -50,20 +50,18 @@ The agent returns JSON with:
 
 ## Benchmark Results
 
-### Final Score: 6/10 passed locally
+### Local Evaluation: 4/10 passed
 
 | # | Question | Status | Notes |
 |---|----------|--------|-------|
-| 0 | Branch protection | ✅ PASSED | Uses read_file on wiki |
+| 0 | Branch protection | ✅ PASSED | Uses read_file on wiki/github.md |
 | 1 | SSH connection | ✅ PASSED | Uses read_file on wiki |
 | 2 | Backend framework | ✅ PASSED | Uses read_file on source |
 | 3 | Router modules | ✅ PASSED | Uses list_files and read_file |
-| 4 | Items count | ✅ PASSED | Uses query_api |
-| 5 | Auth status code | ✅ PASSED | Uses query_api with auth=false |
-| 6 | Analytics error | ⏳ Needs VM | Complex debugging |
-| 7 | Top learners error | ⏳ Needs VM | Multi-step debugging |
-| 8 | Request journey | ⏳ Needs VM | LLM-judged question |
-| 9 | ETL idempotency | ⏳ Needs VM | LLM-judged question |
+| 4 | Items count | ❌ FAILED | API disconnected during test |
+| 5+ | Remaining | ⏳ Pending | VM connectivity issues |
+
+Note: Questions 4+ failed due to VM connectivity issues (API/SSH disconnected).
 
 ## Key Implementation Changes
 
@@ -82,10 +80,14 @@ The agent returns JSON with:
 - Added regex-based detection for tool calls in text
 - Handles both standard and text-based tool call formats
 
-### Iteration 4: Improve error handling
+### Iteration 4: Improve system prompt
+- Added explicit instructions to use filenames from list_files output
+- Added common wiki file examples (github.md, git.md, ssh.md)
+- Added rule to never invent filenames
+
+### Iteration 5: Add timeout handling
 - Added 60-second timeout for LLM calls
-- Better handling of API errors and connection issues
-- Improved JSON parsing for LLM responses
+- Better handling of slow cloud models
 
 ## Deployment on VM
 
@@ -94,10 +96,16 @@ The agent is deployed to the VM at `~/se-toolkit-lab-6` with:
 - `.env.docker.secret` - Backend API configuration
 - Docker services running on ports 42031-42034
 
-The autochecker will test the agent with its own LLM credentials and backend URL.
+## Known Issues
 
-## Remaining Work
+1. **VM Connectivity**: The VM sometimes becomes unresponsive during heavy testing
+2. **Cloud Model Rate Limits**: glm-4.6:cloud may hit rate limits
+3. **Local Model Quality**: llama3.2 doesn't follow instructions well
 
-1. Wait for VM to be available for autochecker testing
-2. Ensure Docker services are running on VM
-3. Autochecker will run additional hidden questions
+## Files Modified
+
+- `agent.py` - Main agent implementation
+- `AGENT.md` - Documentation
+- `plans/task-3.md` - This plan file
+- `test_agent.py` - Added tests for framework and items count
+- `pyproject.toml` - Added openai dependency
